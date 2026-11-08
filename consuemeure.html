@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediLocate – Trouver un médicament en pharmacie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef3f0;
+    --surface: #ffffff;
+    --ink: #15262b;
+    --muted: #5b6e72;
+    --line: #d5e0dc;
+    --brand: #0e6a5f;
+    --brand-ink: #ffffff;
+    --ok: #1f7a45;
+    --ok-bg: #e2f3e8;
+    --ko: #a63a2a;
+    --ko-bg: #f8e4e0;
+    --warn-bg: #fff3d6;
+    --font-title: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1c1f;
+      --surface: #172a2e;
+      --ink: #e6f0ee;
+      --muted: #94aaae;
+      --line: #28434a;
+      --brand: #4fc3b0;
+      --brand-ink: #08201c;
+      --ok: #6fd69a;
+      --ok-bg: #173a29;
+      --ko: #f09a8c;
+      --ko-bg: #3d2420;
+      --warn-bg: #3b3218;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }
+
+  header h1 {
+    font-family: var(--font-title);
+    font-weight: 700;
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  header p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 52ch; }
+
+  form {
+    margin-top: 28px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr auto;
+    gap: 14px;
+    align-items: start;
+  }
+  label { display: block; font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 11px 12px;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
+    outline: 3px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .puce {
+    font: inherit;
+    font-size: .8rem;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .puce:hover { border-color: var(--brand); color: var(--brand); }
+  .puce[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  form { align-items: start; }
+  form > button.primary { align-self: end; }
+
+  button.primary {
+    font: inherit;
+    font-weight: 600;
+    background: var(--brand);
+    color: var(--brand-ink);
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 22px;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: .6; cursor: progress; }
+
+  .pleine-largeur { grid-column: 1 / -1; }
+
+  #statut { margin-top: 28px; min-height: 1.5em; color: var(--muted); }
+  #statut.erreur {
+    color: var(--ko);
+    background: var(--ko-bg);
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+
+  #resultats { display: none; margin-top: 8px; gap: 24px; grid-template-columns: 1.6fr 1fr; align-items: start; }
+  #resultats.visible { display: grid; }
+
+  h2 { font-family: var(--font-title); font-size: 1.35rem; margin: 0 0 14px; letter-spacing: -0.01em; }
+  h3 { font-family: var(--font-title); font-size: 1.05rem; margin: 0 0 6px; }
+
+  .pharmacie {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left-width: 6px;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 16px;
+  }
+  .pharmacie.ok { border-left-color: var(--ok); }
+  .pharmacie.ko { border-left-color: var(--ko); }
+  .pharmacie.inconnu { border-left-color: var(--muted); }
+  .pharmacie .infos { color: var(--muted); font-size: .92rem; }
+  .pharmacie .infos a { color: var(--brand); }
+  .stock { text-align: right; min-width: 130px; }
+  .badge {
+    display: inline-block;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .ok .badge { background: var(--ok-bg); color: var(--ok); }
+  .ko .badge { background: var(--ko-bg); color: var(--ko); }
+  .inconnu .badge { background: var(--warn-bg); color: var(--ink); }
+  .quantite { font-family: var(--font-title); font-weight: 700; font-size: 1.8rem; line-height: 1.1; margin-top: 6px; }
+  .quantite small { font-family: var(--font-body); font-weight: 400; font-size: .85rem; color: var(--muted); }
+  .jauge { height: 6px; background: var(--line); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .jauge > span { display: block; height: 100%; background: var(--ok); }
+
+  .panneau {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .panneau dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: .94rem; }
+  .panneau dt { color: var(--muted); }
+  .panneau dd { margin: 0; }
+  .temperature { font-family: var(--font-title); font-weight: 700; font-size: 2.2rem; line-height: 1; }
+  .vide { color: var(--muted); }
+
+  details.brut { margin-top: 8px; }
+  details.brut summary { cursor: pointer; color: var(--muted); font-size: .9rem; width: fit-content; }
+  details.brut pre {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    max-height: 360px;
+    font-size: .8rem;
+  }
+
+  @media (max-width: 860px) {
+    form { grid-template-columns: 1fr 1fr; }
+    form button { grid-column: 1 / -1; }
+    #resultats.visible { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    form { grid-template-columns: 1fr; }
+    .pharmacie { grid-template-columns: 1fr; }
+    .stock { text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>MediLocate</h1>
+    <p>Cherchez un médicament, choisissez une ville : on affiche les pharmacies proches, leur stock et la météo du jour.</p>
+  </header>
+
+  <form id="formulaire">
+    <div class="pleine-largeur">
+      <label for="base">Adresse du service REST</label>
+      <input id="base" type="url" value="http://localhost:8078" placeholder="http://localhost:8078" required>
+    </div>
+    <div>
+      <label for="medicament">Médicament</label>
+      <input id="medicament" name="medicament" value="doliprane" list="liste-medicaments" placeholder="Écrivez ou choisissez" required autocomplete="off">
+      <div class="suggestions" aria-label="Médicaments fréquents">
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Doliprane">Doliprane</button>
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Efferalgan">Efferalgan</button>
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Aspégic">Aspégic</button>
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Spasfon">Spasfon</button>
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Smecta">Smecta</button>
+        <button type="button" class="puce" data-cible="medicament" data-valeur="Ibuprofène">Ibuprofène</button>
+      </div>
+    </div>
+    <div>
+      <label for="ville">Ville</label>
+      <input id="ville" name="ville" value="Sfax" list="liste-villes" placeholder="Écrivez ou choisissez" required autocomplete="off">
+      <div class="suggestions" aria-label="Villes fréquentes">
+        <button type="button" class="puce" data-cible="ville" data-valeur="Tunis">Tunis</button>
+        <button type="button" class="puce" data-cible="ville" data-valeur="Sfax">Sfax</button>
+        <button type="button" class="puce" data-cible="ville" data-valeur="Sousse">Sousse</button>
+        <button type="button" class="puce" data-cible="ville" data-valeur="Bizerte">Bizerte</button>
+        <button type="button" class="puce" data-cible="ville" data-valeur="Nabeul">Nabeul</button>
+        <button type="button" class="puce" data-cible="ville" data-valeur="Monastir">Monastir</button>
+      </div>
+    </div>
+    <div>
+      <label for="rayon">Rayon</label>
+      <select id="rayon" name="rayon">
+        <option value="1000">1 km</option>
+        <option value="3000" selected>3 km</option>
+        <option value="5000">5 km</option>
+        <option value="10000">10 km</option>
+      </select>
+    </div>
+    <button class="primary" id="bouton" type="submit">Rechercher</button>
+  </form>
+
+  <datalist id="liste-medicaments">
+    <option value="Doliprane"></option>
+    <option value="Dafalgan"></option>
+    <option value="Efferalgan"></option>
+    <option value="Paracétamol"></option>
+    <option value="Codoliprane"></option>
+    <option value="Aspégic"></option>
+    <option value="Aspirine"></option>
+    <option value="Ibuprofène"></option>
+    <option value="Advil"></option>
+    <option value="Nurofen"></option>
+    <option value="Spasfon"></option>
+    <option value="Smecta"></option>
+    <option value="Imodium"></option>
+    <option value="Gaviscon"></option>
+    <option value="Maalox"></option>
+    <option value="Ventoline"></option>
+    <option value="Augmentin"></option>
+    <option value="Amoxicilline"></option>
+    <option value="Azithromycine"></option>
+    <option value="Voltarène"></option>
+    <option value="Biafine"></option>
+    <option value="Humex"></option>
+    <option value="Fervex"></option>
+    <option value="Toplexil"></option>
+    <option value="Levothyrox"></option>
+    <option value="Glucophage"></option>
+    <option value="Kardégic"></option>
+    <option value="Lasilix"></option>
+    <option value="Zyrtec"></option>
+    <option value="Aerius"></option>
+    <option value="Clamoxyl"></option>
+    <option value="Bétadine"></option>
+    <option value="Strepsils"></option>
+    <option value="Dolirhume"></option>
+    <option value="Actifed"></option>
+    <option value="Daflon"></option>
+    <option value="Mopral"></option>
+    <option value="Inexium"></option>
+    <option value="Tahor"></option>
+    <option value="Tramadol"></option>
+  </datalist>
+
+  <datalist id="liste-villes">
+    <option value="Tunis"></option>
+    <option value="Sfax"></option>
+    <option value="Sousse"></option>
+    <option value="Ariana"></option>
+    <option value="Ben Arous"></option>
+    <option value="La Marsa"></option>
+    <option value="Bizerte"></option>
+    <option value="Nabeul"></option>
+    <option value="Hammamet"></option>
+    <option value="Kairouan"></option>
+    <option value="Gabès"></option>
+    <option value="Gafsa"></option>
+    <option value="Monastir"></option>
+    <option value="Mahdia"></option>
+    <option value="Médenine"></option>
+    <option value="Djerba"></option>
+    <option value="Tozeur"></option>
+    <option value="Kasserine"></option>
+    <option value="Béja"></option>
+    <option value="Jendouba"></option>
+    <option value="Le Kef"></option>
+    <option value="Siliana"></option>
+    <option value="Zaghouan"></option>
+    <option value="Manouba"></option>
+    <option value="Tataouine"></option>
+    <option value="Kébili"></option>
+    <option value="Sidi Bouzid"></option>
+    <option value="Paris"></option>
+    <option value="Lyon"></option>
+    <option value="Marseille"></option>
+    <option value="Toulouse"></option>
+    <option value="Nice"></option>
+    <option value="Nantes"></option>
+    <option value="Bordeaux"></option>
+    <option value="Lille"></option>
+  </datalist>
+
+  <p id="statut" role="status" aria-live="polite"></p>
+
+  <main id="resultats">
+    <section aria-labelledby="titre-pharmacies">
+      <h2 id="titre-pharmacies">Pharmacies proches</h2>
+      <div id="liste-pharmacies"></div>
+    </section>
+
+    <aside>
+      <div class="panneau" id="bloc-meteo"></div>
+      <div class="panneau" id="bloc-medicament"></div>
+      <details class="brut">
+        <summary>Voir la réponse JSON brute</summary>
+        <pre id="json-brut"></pre>
+      </details>
+    </aside>
+  </main>
+
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const baseInput = $("base");
+
+  // L'adresse saisie est mémorisée pour la prochaine fois.
+  baseInput.value = localStorage.getItem("medilocate.base") || "http://localhost:8078";
+  baseInput.addEventListener("change", () => localStorage.setItem("medilocate.base", baseInput.value.trim()));
+
+  function baseUrl() {
+    return baseInput.value.trim().replace(/\/+$/, "");
+  }
+
+  // Crée un élément en écrivant le texte de façon sûre (pas d'injection HTML).
+  function el(tag, props = {}, ...enfants) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    for (const e of enfants) if (e) n.append(e);
+    return n;
+  }
+
+  function afficherStatut(message, erreur = false) {
+    const s = $("statut");
+    s.textContent = message;
+    s.className = erreur ? "erreur" : "";
+  }
+
+
+  // Clic sur une suggestion : remplit le champ correspondant
+  document.querySelectorAll(".puce").forEach((b) => {
+    b.addEventListener("click", () => {
+      $(b.dataset.cible).value = b.dataset.valeur;
+      document.querySelectorAll('.puce[data-cible="' + b.dataset.cible + '"]').forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    });
+  });
+
+  // ---------- Pharmacies + stock ----------
+  function carteStock(stock) {
+    const zone = el("div", { class: "stock" });
+    if (!stock || stock.erreur) {
+      zone.append(el("span", { class: "badge", text: "Stock indisponible" }));
+      return { zone, classe: "inconnu" };
+    }
+    if (stock.disponible) {
+      zone.append(el("span", { class: "badge", text: "En stock" }));
+      const q = el("div", { class: "quantite", text: String(stock.quantite) }, el("small", { text: " boîtes" }));
+      zone.append(q);
+      const pct = Math.min(100, Math.round((stock.quantite / 20) * 100));
+      const jauge = el("div", { class: "jauge", "aria-hidden": "true" }, el("span", { style: "width:" + pct + "%" }));
+      zone.append(jauge);
+      return { zone, classe: "ok" };
+    }
+    zone.append(el("span", { class: "badge", text: stock.message || "Rupture de stock" }));
+    return { zone, classe: "ko" };
+  }
+
+  function afficherPharmacies(pharmacies) {
+    const liste = $("liste-pharmacies");
+    liste.replaceChildren();
+    if (!pharmacies || pharmacies.length === 0) {
+      liste.append(el("p", { class: "vide", text: "Aucune pharmacie trouvée dans ce rayon. Essayez un rayon plus grand." }));
+      return;
+    }
+    for (const p of pharmacies) {
+      const { zone, classe } = carteStock(p.stock);
+      const infos = el("div", { class: "infos" });
+      const lignes = [];
+      if (p.adresse) lignes.push(p.adresse);
+      if (p.telephone) lignes.push("Tél. " + p.telephone);
+      infos.append(lignes.join(" – ") || "Adresse non renseignée");
+      if (p.latitude != null && p.longitude != null) {
+        infos.append(el("br"));
+        infos.append(el("a", {
+          href: "https://www.openstreetmap.org/?mlat=" + p.latitude + "&mlon=" + p.longitude + "#map=18/" + p.latitude + "/" + p.longitude,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          text: "Voir sur la carte"
+        }));
+      }
+      const gauche = el("div", {}, el("h3", { text: p.nom || "Pharmacie" }), infos);
+      liste.append(el("article", { class: "pharmacie " + classe }, gauche, zone));
+    }
+  }
+
+  // ---------- Météo (Open-Meteo ou OpenWeatherMap) ----------
+  function afficherMeteo(meteo, position) {
+    const bloc = $("bloc-meteo");
+    bloc.replaceChildren(el("h2", { text: "Météo" }));
+    if (!meteo || meteo.erreur) {
+      bloc.append(el("p", { class: "vide", text: "Météo indisponible pour le moment." }));
+      return;
+    }
+    const d = meteo.donnees || {};
+    let temp = null, detail = "";
+    if (d.current_weather) {
+      temp = d.current_weather.temperature;
+      detail = "Vent " + d.current_weather.windspeed + " km/h";
+    } else if (d.main) {
+      temp = d.main.temp;
+      const desc = d.weather && d.weather[0] ? d.weather[0].description : "";
+      detail = (desc ? desc.charAt(0).toUpperCase() + desc.slice(1) + ". " : "") + "Humidité " + d.main.humidity + " %";
+    }
+    if (temp == null) {
+      bloc.append(el("p", { class: "vide", text: "Données météo non reconnues." }));
+      return;
+    }
+    bloc.append(el("div", { class: "temperature", text: Math.round(temp) + " °C" }));
+    bloc.append(el("p", { text: detail }));
+    bloc.append(el("p", { class: "vide", text: (position && position.nom ? position.nom + ". " : "") + "Source : " + meteo.source }));
+  }
+
+  // ---------- Infos médicament (API Médicaments FR) ----------
+  function premierMedicament(infos) {
+    if (!infos || infos.erreur) return null;
+    if (Array.isArray(infos)) return infos[0] || null;
+    // Au cas où l'API enveloppe la liste dans un objet
+    for (const v of Object.values(infos)) if (Array.isArray(v) && v.length) return v[0];
+    return infos.cis ? infos : null;
+  }
+
+  function afficherMedicament(infos, nomCherche) {
+    const bloc = $("bloc-medicament");
+    bloc.replaceChildren(el("h2", { text: "À propos du médicament" }));
+    const m = premierMedicament(infos);
+    if (!m) {
+      const raison = infos && infos.erreur ? infos.erreur : "Aucune fiche trouvée pour « " + nomCherche + " ».";
+      bloc.append(el("p", { class: "vide", text: raison }));
+      return;
+    }
+    const dl = el("dl");
+    const ajouter = (titre, valeur) => {
+      if (valeur === undefined || valeur === null || valeur === "") return;
+      dl.append(el("dt", { text: titre }), el("dd", { text: String(valeur) }));
+    };
+    ajouter("Nom", m.elementPharmaceutique);
+    ajouter("Forme", m.formePharmaceutique);
+    ajouter("Voie", Array.isArray(m.voiesAdministration) ? m.voiesAdministration.join(", ") : m.voiesAdministration);
+    ajouter("Laboratoire", m.titulaire);
+    ajouter("Autorisation", m.statusAutorisation);
+    if (Array.isArray(m.composition) && m.composition.length) {
+      const sub = m.composition.map((c) => c.denominationSubstance + (c.dosage ? " (" + c.dosage + ")" : ""));
+      ajouter("Composition", [...new Set(sub)].join(", "));
+    }
+    const pres = Array.isArray(m.presentation) ? m.presentation.find((p) => p.prixPublic != null) : null;
+    if (pres) {
+      ajouter("Prix public", pres.prixPublic + " € (indicatif, France)");
+      ajouter("Remboursement", pres.tauxRemboursement);
+    }
+    bloc.append(dl);
+  }
+
+  // ---------- Appel du service REST ----------
+  $("formulaire").addEventListener("submit", async (evt) => {
+    evt.preventDefault();
+    const bouton = $("bouton");
+    const params = new URLSearchParams({
+      medicament: $("medicament").value.trim(),
+      ville: $("ville").value.trim(),
+      rayon: $("rayon").value
+    });
+
+    bouton.disabled = true;
+    $("resultats").classList.remove("visible");
+    afficherStatut("Recherche en cours, cela peut prendre quelques secondes…");
+
+    try {
+      const reponse = await fetch(baseUrl() + "/api/recherche?" + params.toString());
+      if (!reponse.ok) throw new Error("Le service REST a répondu avec l'erreur " + reponse.status + ".");
+      const data = await reponse.json();
+
+      if (data.erreur) {
+        afficherStatut(data.erreur, true);
+        return;
+      }
+
+      afficherPharmacies(data.pharmacies);
+      afficherMeteo(data.meteo, data.position);
+      afficherMedicament(data.infosMedicament, data.medicament);
+      $("json-brut").textContent = JSON.stringify(data, null, 2);
+      $("resultats").classList.add("visible");
+
+      const n = (data.pharmacies || []).length;
+      afficherStatut(n + (n > 1 ? " pharmacies trouvées" : " pharmacie trouvée") + " près de " + data.ville + ".");
+      if (data.erreurPharmacies) afficherStatut("Les pharmacies n'ont pas pu être chargées : " + data.erreurPharmacies, true);
+    } catch (e) {
+      const horsLigne = e instanceof TypeError;
+      afficherStatut(
+        horsLigne
+          ? "Impossible de joindre le service REST à l'adresse " + baseUrl() + ". Vérifiez qu'il est lancé, que l'adresse est correcte, et que @CrossOrigin est ajouté dans le contrôleur REST."
+          : e.message,
+        true
+      );
+    } finally {
+      bouton.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
